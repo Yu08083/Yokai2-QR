@@ -15,7 +15,7 @@ function toast(message, error = false) {
 }
 
 function getFormat() { return state.catalog?.formats?.find((format) => format.id === state.format); }
-function activeRewards() { return state.tableVersion === "base" ? state.catalog?.base_rewards || [] : state.catalog?.rewards || []; }
+function activeRewards() { return state.catalog ? QRLocal.rewardTable(state.catalog, state.tableVersion).rewards : []; }
 
 function usageRecords() { return state.usage.profiles[state.usageProfile]; }
 
@@ -149,6 +149,7 @@ function renderHistory() {
 }
 
 function showHistory() {
+  setMainView(false);
   renderHistory();
   $("history-section").hidden = false;
   $("history-section").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -412,9 +413,11 @@ async function applyDecoded(decoded, ecc) {
   const format = state.catalog.formats.find(item => item.id === decoded.format);
   if (!format || format.id === "raw") throw new Error("対応するゲーム用QRではありません。");
   if (!decoded.hex) throw new Error("QRデータを読み取れませんでした。");
-  if (["update", "base"].includes(decoded.table_version)) {
+  if (Object.hasOwn(state.catalog.versions, decoded.table_version)) {
     state.tableVersion = decoded.table_version;
     $("version-select").value = state.tableVersion;
+    $("password-version").value = state.tableVersion;
+    renderPasswordRewards();
   }
   state.template = normalizeHex(decoded.hex);
   state.series = null;
@@ -448,7 +451,7 @@ async function importFile(file) {
       const projectGame = project.game || /^yw[23]-qr-editor$/.test(project.application || "") && project.application.slice(0, 3);
       if (projectGame && projectGame !== game) throw new Error("別の作品のQRデータです。対応する作品のエディターで開いてください。");
       ecc = ["L", "M", "Q", "H"].includes(project.ecc) ? project.ecc : $("ecc-select").value;
-      const tableVersion = ["update", "base"].includes(project.table_version) ? project.table_version : state.tableVersion;
+      const tableVersion = Object.hasOwn(state.catalog.versions, project.table_version) ? project.table_version : state.tableVersion;
       savedSeries = project.series;
       if (project.hex) decoded = await api("/api/decode", { hex: normalizeHex(project.hex), ecc, table_version: tableVersion });
       else if (project.format && project.fields && typeof project.fields === "object") decoded = await api("/api/generate", { format: project.format, fields: project.fields, ecc, table_version: tableVersion, ...(project.template_hex ? { template_hex: project.template_hex } : {}) });
@@ -489,8 +492,108 @@ function saveProject() {
   download(new Blob([JSON.stringify(project, null, 2) + "\n"], { type: "application/json;charset=utf-8" }), "json");
 }
 
-function openImport() { $("import-error").hidden = true; $("import-dialog").showModal(); }
-function showNotes() { $("notes-section").hidden = false; $("notes-section").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" }); }
+function setMainView(passwords, updateHash = true) {
+  document.querySelector(".workspace").hidden = passwords;
+  $("password-section").hidden = !passwords;
+  for (const [id, selected] of [["nav-editor", !passwords], ["nav-passwords", passwords]]) {
+    $(id).classList.toggle("selected", selected);
+    $(id).setAttribute("aria-pressed", String(selected));
+  }
+  if (passwords) { $("history-section").hidden = true; $("notes-section").hidden = true; }
+  if (updateHash) {
+    const url = new URL(location.href);
+    if (passwords) url.hash = "passwords";
+    else if (url.hash === "#passwords") url.hash = "";
+    history.replaceState(null, "", url);
+  }
+}
+
+function passwordRows() {
+  const version = $("password-version").value;
+  const rows = state.catalog?.passwords?.[version] || [];
+  return $("password-aliases").checked ? rows.concat(state.catalog?.password_aliases?.[version] || []) : rows;
+}
+
+function renderPasswordRewards() {
+  const selected = $("password-reward").value;
+  const rewards = [...new Set(passwordRows().map(row => row.reward))];
+  $("password-reward").replaceChildren(new Option("すべて", ""), ...rewards.map(reward => new Option(reward, reward)));
+  $("password-reward").value = rewards.includes(selected) ? selected : "";
+  renderPasswords();
+}
+
+function renderPasswords() {
+  const normalize = text => String(text).normalize("NFKC").toLocaleLowerCase("ja").replace(/\s/g, "");
+  const query = normalize($("password-search").value);
+  const reward = $("password-reward").value;
+  const all = passwordRows();
+  const rows = all.filter(row => (!reward || row.reward === reward) && (!query || normalize(row.password).includes(query) || normalize(row.reward).includes(query)));
+  $("password-count").textContent = rows.length === all.length ? `${all.length}件` : `${rows.length} / ${all.length}件`;
+  $("password-list").replaceChildren(...rows.map(row => {
+    const tr = document.createElement("tr");
+    const password = document.createElement("td");
+    password.className = "password-value";
+    password.textContent = row.password;
+    if (row.generated) {
+      const badge = document.createElement("span");
+      badge.className = "password-kind";
+      badge.textContent = "解析";
+      password.append(badge);
+    }
+    const item = document.createElement("td");
+    item.className = "password-item";
+    item.textContent = row.reward + (row.quantity > 1 ? ` ×${row.quantity}` : "");
+    const action = document.createElement("td");
+    action.className = "password-action";
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "text-button";
+    copy.textContent = "コピー";
+    copy.setAttribute("aria-label", `「${row.password}」をコピー`);
+    copy.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(row.password); toast("パスワードをコピーしました。"); }
+      catch (_) { toast("コピーできませんでした。表示された文字列を選択してコピーしてください。", true); }
+    });
+    action.append(copy);
+    tr.append(password, item, action);
+    return tr;
+  }));
+  $("password-empty").hidden = rows.length > 0;
+  $("password-note").textContent = state.catalog?.password_notes?.[$("password-version").value] || "";
+}
+
+function initPasswords() {
+  $("password-version").replaceChildren(...Object.entries(state.catalog.versions).map(([version, label]) => new Option(label, version)));
+  $("password-alias-option").hidden = !state.catalog.password_aliases;
+  const sources = state.catalog.password_sources || [];
+  $("password-sources").replaceChildren();
+  $("password-sources").hidden = !sources.length;
+  if (sources.length) {
+    $("password-sources").append("入力文字列の参照元：");
+    sources.forEach((source, index) => {
+      const link = document.createElement("a");
+      link.href = source.url;
+      link.textContent = source.title;
+      if (index) $("password-sources").append(" / ");
+      $("password-sources").append(link);
+    });
+  }
+  renderPasswordRewards();
+  setMainView(location.hash === "#passwords", false);
+}
+
+function changeTableVersion(version) {
+  state.tableVersion = version;
+  $("version-select").value = version;
+  $("password-version").value = version;
+  renderRewards();
+  renderPasswordRewards();
+  invalidateResult();
+  generate({ quiet: true, preserveSeries: true });
+}
+
+function openImport() { setMainView(false); $("import-error").hidden = true; $("import-dialog").showModal(); }
+function showNotes() { setMainView(false); $("notes-section").hidden = false; $("notes-section").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" }); }
 
 function bindEvents() {
   loadUsage();
@@ -511,7 +614,7 @@ function bindEvents() {
   $("open-scan").addEventListener("click", () => $("scan-dialog").showModal());
   $("close-scan").addEventListener("click", () => $("scan-dialog").close());
   document.addEventListener("keydown", event => {
-    if (event.ctrlKey || event.altKey || event.metaKey || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(event.target.tagName) || $("import-dialog").open) return;
+    if (event.ctrlKey || event.altKey || event.metaKey || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(event.target.tagName) || $("import-dialog").open || !$("password-section").hidden) return;
     if (event.key === "ArrowRight" || event.key === "ArrowLeft") { event.preventDefault(); navigateQR(event.key === "ArrowRight" ? 1 : -1); }
   });
   $("drop-zone").tabIndex = 0;
@@ -519,7 +622,7 @@ function bindEvents() {
   $("file-input").tabIndex = -1;
   $("drop-zone").addEventListener("keydown", (event) => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); $("file-input").click(); } });
   $("format-select").addEventListener("change", () => { state.format = $("format-select").value; state.template = null; state.templateFormat = null; renderFields(); invalidateResult(); });
-  $("version-select").addEventListener("change", () => { state.tableVersion = $("version-select").value; renderRewards(); invalidateResult(); generate({ quiet: true, preserveSeries: true }); });
+  $("version-select").addEventListener("change", () => changeTableVersion($("version-select").value));
   $("reward-search").addEventListener("input", renderRewards);
   $("reward-select").addEventListener("change", selectReward);
   $("panda-preset").addEventListener("click", applyPandaPreset);
@@ -534,7 +637,13 @@ function bindEvents() {
   $("drop-zone").addEventListener("drop", (event) => importFile(event.dataTransfer.files[0]));
   $("nav-notes").addEventListener("click", showNotes);
   $("close-notes").addEventListener("click", () => { $("notes-section").hidden = true; });
-  $("nav-editor").addEventListener("click", () => document.querySelector(".workspace").scrollIntoView({ behavior: "smooth" }));
+  $("nav-editor").addEventListener("click", () => { setMainView(false); document.querySelector(".workspace").scrollIntoView({ behavior: "smooth" }); });
+  $("nav-passwords").addEventListener("click", () => { setMainView(true); $("password-section").scrollIntoView({ behavior: "smooth", block: "start" }); });
+  $("password-search").addEventListener("input", renderPasswords);
+  $("password-reward").addEventListener("change", renderPasswords);
+  $("password-version").addEventListener("change", () => changeTableVersion($("password-version").value));
+  $("password-aliases").addEventListener("change", renderPasswordRewards);
+  window.addEventListener("hashchange", () => setMainView(location.hash === "#passwords", false));
   $("download-png").addEventListener("click", downloadPNG);
   $("download-svg").addEventListener("click", () => state.result?.svg && download(new Blob([state.result.svg], { type: "image/svg+xml;charset=utf-8" }), "svg"));
   $("download-project").addEventListener("click", saveProject);
@@ -545,7 +654,8 @@ async function init() {
   $("generate-button").disabled = true;
   try {
     state.catalog = await api("/api/catalog");
-    $("version-select").replaceChildren(...["update", "base"].map(version => new Option(state.catalog.versions?.[version] || version, version)));
+    initPasswords();
+    $("version-select").replaceChildren(...Object.entries(state.catalog.versions).map(([version, label]) => new Option(label, version)));
     const formats = (state.catalog.formats || []).filter((format) => format.id !== "raw");
     $("format-select").replaceChildren();
     formats.forEach((format) => { const option = document.createElement("option"); option.value = format.id; option.textContent = format.label || format.id; $("format-select").append(option); });

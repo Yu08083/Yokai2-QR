@@ -48,15 +48,24 @@ const QRLocal = (() => {
   }
 
   function rewardLabel(reward, catalog, tableVersion = "update") {
-    const pools = tableVersion === "update" ? catalog.named_random_pools : catalog.base_named_random_pools;
+    const pools = rewardTable(catalog, tableVersion).named_random_pools;
     const pool = pools?.[reward.random_table] || [];
     const family = pool[0]?.name?.split("・")[0];
     if (["超", "極"].includes(family) && pool.length === 8 && pool.every(item => item.name.startsWith(family + "・"))) return `${family}コイン（8色から抽選）`;
     return reward.label || reward.name || "名称未確認";
   }
 
+  function rewardTable(catalog, tableVersion = "update") {
+    const version = catalog.version_tables?.[tableVersion] || tableVersion;
+    if (version === "update") return { rewards: catalog.rewards, named_random_pools: catalog.named_random_pools, random_pools: catalog.random_pools };
+    if (version === "base") return { rewards: catalog.base_rewards, named_random_pools: catalog.base_named_random_pools, random_pools: catalog.random_pools };
+    const table = catalog.extra_tables?.[version];
+    if (!table) throw new Error("報酬表のバージョンが不正です。");
+    return table;
+  }
+
   function describe(payload, catalog, tableVersion = "update") {
-    if (!["base", "update"].includes(tableVersion)) throw new Error("報酬表のバージョンが不正です。");
+    const table = rewardTable(catalog, tableVersion);
     const parsed = decode(payload);
     const warnings = [];
     const details = { payload: [...payload].map(byte => byte < 128 ? String.fromCharCode(byte) : "\\x" + byte.toString(16).padStart(2, "0")).join(""), "報酬表": catalog.versions?.[tableVersion] || (tableVersion === "update" ? "更新版" : "本体版") };
@@ -75,12 +84,12 @@ const QRLocal = (() => {
     }
     if (catalog.game_id === "yw3" && parsed.profile === "yw1-jp" && fields.qr_type + fields.serial === "P1ZZZY") {
       details["表示名"] = "引き継ぎ状態変更用の特殊QR";
-      details["特殊処理（認証成功時）"] = tableVersion === "update" ? "引き継ぎ済み状態を解除" : "専用分岐あり・状態変更なし";
+      details["特殊処理（認証成功時）"] = tableVersion === "update" ? "引き継ぎ済み状態を解除" : tableVersion === "base" ? "専用分岐あり・状態変更なし" : "この版の特殊処理は未確認";
       details["報酬"] = "アイテム付与なし（専用分岐）";
       warnings.push("アイテムや妖怪を受け取るQRではありません。");
       return { format: parsed.profile, fields, warnings, details };
     }
-    const rows = tableVersion === "update" ? catalog.rewards : catalog.base_rewards;
+    const rows = table.rewards;
     const number = parseInt(fields.qr_type, 36);
     const reward = rows.find(row => row.profile === parsed.profile && row.start <= number && number <= row.end);
     if (reward) {
@@ -89,7 +98,7 @@ const QRLocal = (() => {
       details["アイテムID"] = "0x" + reward.item_id.toString(16).toUpperCase().padStart(8, "0");
       if (reward.grants) details.grants = reward.grants;
       if (reward.random_table) {
-        const pools = tableVersion === "update" ? catalog.named_random_pools : catalog.base_named_random_pools;
+        const pools = table.named_random_pools;
         details.random_pool = pools?.[reward.random_table] || [];
         warnings.push("このQRの受け取り内容はゲーム内で抽選されます。");
       }
@@ -179,7 +188,7 @@ const QRLocal = (() => {
     return render(payload, catalog, data.ecc || "M", data.table_version || "update");
   }
 
-  return { encode, decode, checksum, parseHex, rewardLabel, describe, makeQR, readImage, request };
+  return { encode, decode, checksum, parseHex, rewardTable, rewardLabel, describe, makeQR, readImage, request };
 })();
 
 if (typeof module === "object" && module.exports) module.exports = QRLocal;

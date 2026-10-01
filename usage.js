@@ -62,7 +62,7 @@ const QRUsage = (() => {
   function groupRewards(rows, profile) {
     const groups = new Map();
     rows.forEach((row, index) => {
-      if (row.profile !== profile) return;
+      if (row.profile !== profile || row.start > row.end) return;
       const key = row.reward_group ?? row.item_id;
       if (!groups.has(key)) groups.set(key, { ...row, index, ranges: [] });
       groups.get(key).ranges.push([row.start, row.end]);

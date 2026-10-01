@@ -17,7 +17,8 @@
     <div class="site-header-inner">
       <h1><span class="game-name">妖怪ウォッチ2</span> QRエディター</h1>
       <nav class="site-nav" aria-label="メニュー">
-        <button id="nav-editor" class="selected" type="button">作成</button>
+        <button id="nav-editor" class="selected" type="button" aria-pressed="true">作成</button>
+        <button id="nav-passwords" type="button" aria-pressed="false">パスワード</button>
         <button id="nav-import" type="button">ファイルを開く</button>
         <button id="nav-history" type="button">使用メモ</button>
         <button id="nav-notes" type="button">仕様・使い方</button>
@@ -71,6 +72,19 @@
         <div id="warnings" class="warnings" hidden></div>
         <div class="export-section"><span class="section-label">保存</span><div class="download-grid"><button class="button secondary" id="download-png" type="button" disabled>PNG画像</button><button class="button secondary" id="download-svg" type="button" disabled>SVG画像</button><button class="button secondary" id="download-project" type="button" disabled>QRデータ (.json)</button></div></div>
       </section>
+    </section>
+    <section class="card password-card" id="password-section" aria-labelledby="password-title" hidden>
+      <div class="card-heading"><h2 id="password-title">パスワード</h2><span class="small-label" id="password-count" role="status" aria-live="polite">読み込み中…</span></div>
+      <p class="password-intro">ゲームのパスワード入力画面に、表示された文字列をそのまま入力してください。</p>
+      <div id="password-alias-option" class="password-alias-option" hidden><label><input id="password-aliases" type="checkbox">解析パスワードも表示</label><p>配布時の文字列とは異なります。ROMの判定処理のみ検証・実機未検証です。同じ報酬枠の再受け取りはできません。</p></div>
+      <div class="password-filters">
+        <div class="field"><label for="password-search">検索</label><input id="password-search" type="search" placeholder="パスワード・もらえるもの" autocomplete="off"></div>
+        <div class="field"><label for="password-reward">もらえるもの</label><select id="password-reward"><option value="">すべて</option></select></div>
+        <div class="field"><label for="password-version">ゲームの版</label><select id="password-version"><option value="update">更新版 v3.4.0</option><option value="base">本体版 v0.1.0</option></select></div>
+      </div>
+      <table class="password-table"><caption class="visually-hidden">パスワードと受け取り内容</caption><thead><tr><th scope="col">パスワード</th><th scope="col">もらえるもの</th><th scope="col"><span class="visually-hidden">コピー</span></th></tr></thead><tbody id="password-list"></tbody></table>
+      <p id="password-empty" class="password-empty" hidden>該当するパスワードはありません。</p>
+      <details class="password-about"><summary>掲載内容について</summary><p id="password-note"></p><p id="password-sources" hidden></p></details>
     </section>
     <section class="card history-card" id="history-section" hidden>
       <div class="card-heading"><h2>使用メモ</h2><button class="text-button" id="close-history" type="button">閉じる</button></div>

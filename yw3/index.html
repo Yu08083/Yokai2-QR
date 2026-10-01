@@ -17,7 +17,8 @@
     <div class="site-header-inner">
       <h1><span class="game-name">妖怪ウォッチ3</span> QRエディター</h1>
       <nav class="site-nav" aria-label="メニュー">
-        <button id="nav-editor" class="selected" type="button">作成</button>
+        <button id="nav-editor" class="selected" type="button" aria-pressed="true">作成</button>
+        <button id="nav-passwords" type="button" aria-pressed="false">パスワード</button>
         <button id="nav-import" type="button">ファイルを開く</button>
         <button id="nav-history" type="button">使用メモ</button>
         <button id="nav-notes" type="button">仕様・使い方</button>
@@ -30,7 +31,7 @@
         <section class="card editor-card">
           <div class="card-heading"><h2>アイテム</h2><span class="small-label" id="edit-state">新規</span></div>
           <div id="structured-panel">
-            <div class="field format-field"><label for="format-select">QR形式</label><select id="format-select" disabled><option>読み込み中…</option></select></div>
+            <div class="field version-field"><label for="version-select">ゲームの版</label><select id="version-select"><option value="update">スキヤキ・更新版</option><option value="base">スキヤキ・本体版</option></select><p class="field-help">実際の報酬はゲームの版で決まります。</p></div><div class="field format-field"><label for="format-select">QR形式</label><select id="format-select" disabled><option>読み込み中…</option></select></div>
             <div class="reward-picker" id="reward-picker" hidden>
               <div class="label-row"><label for="reward-search">アイテム</label><span class="small-label" id="reward-count"></span></div>
               <input id="reward-search" type="search" placeholder="アイテム名で検索" autocomplete="off" aria-label="受け取り内容を検索">
@@ -42,7 +43,7 @@
               <summary>詳細設定</summary>
               <div class="advanced-content">
                 <p class="field-help" id="format-description"></p>
-                <div class="field version-field"><label for="version-select">報酬表</label><select id="version-select"><option value="update">スキヤキ・更新版</option><option value="base">スキヤキ・本体版</option></select><p class="field-help">実際の報酬はゲームの版で決まります。</p></div>
+
                 <div class="field-divider"></div><div id="dynamic-fields" class="fields-grid"></div>
                 <div class="template-note" id="template-note" hidden>読み込んだデータのURL接頭辞を保持します。</div>
               </div>
@@ -72,6 +73,19 @@
         <div class="export-section"><span class="section-label">保存</span><div class="download-grid"><button class="button secondary" id="download-png" type="button" disabled>PNG画像</button><button class="button secondary" id="download-svg" type="button" disabled>SVG画像</button><button class="button secondary" id="download-project" type="button" disabled>QRデータ (.json)</button></div></div>
       </section>
     </section>
+    <section class="card password-card" id="password-section" aria-labelledby="password-title" hidden>
+      <div class="card-heading"><h2 id="password-title">パスワード</h2><span class="small-label" id="password-count" role="status" aria-live="polite">読み込み中…</span></div>
+      <p class="password-intro">ゲームのパスワード入力画面に、表示された文字列をそのまま入力してください。</p>
+      <div id="password-alias-option" class="password-alias-option" hidden><label><input id="password-aliases" type="checkbox">解析パスワードも表示</label><p>配布時の文字列とは異なります。ROMの判定処理のみ検証・実機未検証です。同じ報酬枠の再受け取りはできません。</p></div>
+      <div class="password-filters">
+        <div class="field"><label for="password-search">検索</label><input id="password-search" type="search" placeholder="パスワード・もらえるもの" autocomplete="off"></div>
+        <div class="field"><label for="password-reward">もらえるもの</label><select id="password-reward"><option value="">すべて</option></select></div>
+        <div class="field"><label for="password-version">ゲームの版</label><select id="password-version"><option value="update">更新版 v3.4.0</option><option value="base">本体版 v0.1.0</option></select></div>
+      </div>
+      <table class="password-table"><caption class="visually-hidden">パスワードと受け取り内容</caption><thead><tr><th scope="col">パスワード</th><th scope="col">もらえるもの</th><th scope="col"><span class="visually-hidden">コピー</span></th></tr></thead><tbody id="password-list"></tbody></table>
+      <p id="password-empty" class="password-empty" hidden>該当するパスワードはありません。</p>
+      <details class="password-about"><summary>掲載内容について</summary><p id="password-note"></p><p id="password-sources" hidden></p></details>
+    </section>
     <section class="card history-card" id="history-section" hidden>
       <div class="card-heading"><h2>使用メモ</h2><button class="text-button" id="close-history" type="button">閉じる</button></div>
       <p id="history-summary"></p><p class="field-help">ブラウザーを変える場合は、メモを保存して読み込んでください。</p>
@@ -83,7 +97,7 @@
       <p>アイテムを選ぶとQRが表示されます。「次へ」で個体番号を進められます。読み取ったQRには、セーブごとに使用メモを付けられます。</p>
       <div id="catalog-notes"></div><p class="notes-footnote">QRの認証処理はゲームのコードで確認しています。すべての報酬を実機で検証したものではありません。</p>
     </section>
-    <footer class="page-footer"><span>妖怪ウォッチ3 スキヤキ（日本版）対応・非公式ツール</span><span>使用メモはこのブラウザーに保存されます。</span><a href="./vendor-licenses.txt">ライセンス</a></footer>
+    <footer class="page-footer"><span>妖怪ウォッチ3 スシ・テンプラ・スキヤキ（日本版）対応・非公式ツール</span><span>使用メモはこのブラウザーに保存されます。</span><a href="./vendor-licenses.txt">ライセンス</a></footer>
   </main>
   <div id="status-message" class="status-message" role="status" aria-live="polite" hidden></div>
   <dialog id="scan-dialog" class="scan-dialog"><div class="dialog-heading"><h2 id="scan-title">QRコード</h2><button class="icon-button" id="close-scan" type="button" aria-label="大きいQRを閉じる">×</button></div><img id="scan-image" alt="読み取り用の大きなQRコード"><p id="scan-caption"></p><div class="scan-usage-summary"><span id="scan-usage-profile"></span><span id="scan-used" class="used-badge"></span></div><div class="qr-pager"><button class="button secondary" id="scan-previous" type="button">前へ</button><span id="scan-page"></span><button class="button secondary" id="scan-next" type="button">次へ</button></div><button class="button primary" id="scan-mark-next" type="button">記録して次へ</button></dialog>
