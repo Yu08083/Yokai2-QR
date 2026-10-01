@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="ja" data-game="yw2">
+<html lang="ja" data-game="yw3">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f7f6f3">
-  <title>妖怪ウォッチ2 QRエディター</title>
+  <title>妖怪ウォッチ3 QRエディター</title>
   <link rel="stylesheet" href="./style.css">
   <link rel="stylesheet" href="./public.css">
   <script src="./vendor.js" defer></script>
@@ -15,7 +15,7 @@
 <body>
   <header class="site-header">
     <div class="site-header-inner">
-      <h1><span class="game-name">妖怪ウォッチ2</span> QRエディター</h1>
+      <h1><span class="game-name">妖怪ウォッチ3</span> QRエディター</h1>
       <nav class="site-nav" aria-label="メニュー">
         <button id="nav-editor" class="selected" type="button">作成</button>
         <button id="nav-import" type="button">ファイルを開く</button>
@@ -42,7 +42,7 @@
               <summary>詳細設定</summary>
               <div class="advanced-content">
                 <p class="field-help" id="format-description"></p>
-                <div class="field version-field"><label for="version-select">報酬表</label><select id="version-select"><option value="update">更新版 v3.4.0</option><option value="base">本体版 v0.1.0</option></select><p class="field-help">実際の報酬はゲームの版で決まります。</p></div>
+                <div class="field version-field"><label for="version-select">報酬表</label><select id="version-select"><option value="update">スキヤキ・更新版</option><option value="base">スキヤキ・本体版</option></select><p class="field-help">実際の報酬はゲームの版で決まります。</p></div>
                 <div class="field-divider"></div><div id="dynamic-fields" class="fields-grid"></div>
                 <div class="template-note" id="template-note" hidden>読み込んだデータのURL接頭辞を保持します。</div>
               </div>
@@ -61,7 +61,7 @@
             <div class="qr-pager" aria-label="QRの切替"><button class="button secondary" id="previous-qr" type="button" disabled>前へ</button><span id="page-number" aria-live="polite">1枚目</span><button class="button secondary" id="next-qr" type="button" disabled>次へ</button></div>
           </div>
           <div class="usage-panel">
-            <div class="usage-heading"><label for="usage-profile">使用メモ</label><select id="usage-profile"><option value="save1">セーブ1</option><option value="save2">セーブ2</option><option value="save3">セーブ3</option></select></div>
+            <div class="usage-heading"><label for="usage-profile">使用メモ</label><select id="usage-profile"><option value="save1">セーブ1</option><option value="save2">セーブ2</option></select></div>
             <div class="usage-status"><span id="used-badge" class="used-badge">未記録</span><button class="text-button" id="toggle-used" type="button" disabled>使用済みを記録</button></div>
             <button class="button primary" id="mark-next" type="button" disabled>記録して次へ</button>
             <button class="text-button skip-button" id="next-unrecorded" type="button" disabled>記録済みを飛ばす</button>
@@ -81,9 +81,9 @@
     <section class="card notes-card" id="notes-section" hidden>
       <div class="card-heading"><h2>仕様・使い方</h2><button class="text-button" id="close-notes" type="button">閉じる</button></div>
       <p>アイテムを選ぶとQRが表示されます。「次へ」で個体番号を進められます。読み取ったQRには、セーブごとに使用メモを付けられます。</p>
-      <div id="catalog-notes"></div><p class="notes-footnote">ツチノコパンダの特殊QRは、すれちがい受信側での出現報告があります。通常のアイテムQRの実機動作は未検証です。</p>
+      <div id="catalog-notes"></div><p class="notes-footnote">QRの認証処理はゲームのコードで確認しています。すべての報酬を実機で検証したものではありません。</p>
     </section>
-    <footer class="page-footer"><span>妖怪ウォッチ2 真打対応・非公式ツール</span><span>使用メモはこのブラウザーに保存されます。</span><a href="./vendor-licenses.txt">ライセンス</a></footer>
+    <footer class="page-footer"><span>妖怪ウォッチ3 スキヤキ（日本版）対応・非公式ツール</span><span>使用メモはこのブラウザーに保存されます。</span><a href="./vendor-licenses.txt">ライセンス</a></footer>
   </main>
   <div id="status-message" class="status-message" role="status" aria-live="polite" hidden></div>
   <dialog id="scan-dialog" class="scan-dialog"><div class="dialog-heading"><h2 id="scan-title">QRコード</h2><button class="icon-button" id="close-scan" type="button" aria-label="大きいQRを閉じる">×</button></div><img id="scan-image" alt="読み取り用の大きなQRコード"><p id="scan-caption"></p><div class="scan-usage-summary"><span id="scan-usage-profile"></span><span id="scan-used" class="used-badge"></span></div><div class="qr-pager"><button class="button secondary" id="scan-previous" type="button">前へ</button><span id="scan-page"></span><button class="button secondary" id="scan-next" type="button">次へ</button></div><button class="button primary" id="scan-mark-next" type="button">記録して次へ</button></dialog>
