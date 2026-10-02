@@ -99,13 +99,13 @@ const QRLocal = (() => {
     }
     if (["yw2", "yw3"].includes(catalog.game_id) && parsed.profile === "yw1-jp" && fields.qr_type + fields.serial === "P1ZZZZ") {
       details["特殊処理（認証成功時）"] = "ツチノコパンダのすれちがい送信開始フラグを設定";
-      details["表示名"] = "ツチノコパンダ 特殊QR";
+      details["表示名"] = "ツチノコパンダ";
       details["報酬"] = "アイテム付与なし（専用分岐）";
       warnings.push(catalog.game_id === "yw3" ? "読み取り後、さすらい荘で登録・更新し、別の3DSとすれちがってください。QRを読んだ本体へ直接出現させるものではありません。" : "読み取り後、さすらい荘で登録・更新し、別の3DSとすれちがってください。「使用済み」と表示されても送信準備が進む処理です。受信側での出現報告があります。");
       return { format: parsed.profile, fields, warnings, details };
     }
     if (catalog.game_id === "yw3" && parsed.profile === "yw1-jp" && fields.qr_type + fields.serial === "P1ZZZY") {
-      details["表示名"] = "引き継ぎ状態変更用の特殊QR";
+      details["表示名"] = "引き継ぎ回数リセット";
       details["特殊処理（認証成功時）"] = tableVersion === "update" ? "引き継ぎ済み状態を解除" : tableVersion === "base" ? "専用分岐あり・状態変更なし" : "この版の特殊処理は未確認";
       details["報酬"] = "アイテム付与なし（専用分岐）";
       warnings.push("アイテムや妖怪を受け取るQRではありません。");
