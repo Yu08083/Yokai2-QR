@@ -6,8 +6,9 @@ const QRUsage = (() => {
   const PROFILE_IDS = ["save1", "save2", "save3"];
   const validKey = /^(yw2:[0-9A-Z]{3}|yw1-jp:[0-9A-Z]{2}):[0-9A-Z]{4}$/;
 
-  function profileIds(game = "yw2") { return game === "yw3" ? PROFILE_IDS.slice(0, 2) : PROFILE_IDS; }
-  function storageKey(game = "yw2") { return game === "yw3" ? "yw3-qr-usage-v1" : STORAGE_KEY; }
+  function profileIds(game = "yw2") { return game === "busters" ? ["red1", "red2", "red3", "white1", "white2", "white3"] : game === "yw3" ? PROFILE_IDS.slice(0, 2) : PROFILE_IDS; }
+  function profileLabel(game, profile) { return game === "busters" ? `${profile.startsWith("red") ? "赤猫団" : "白犬隊"}・セーブ${profile.slice(-1)}` : `セーブ${profile.slice(-1)}`; }
+  function storageKey(game = "yw2") { return game === "yw2" ? STORAGE_KEY : `${game}-qr-usage-v1`; }
 
   function keyFor(result) {
     if (!result || result.details?.checksum_valid !== true) return null;
@@ -45,7 +46,7 @@ const QRUsage = (() => {
   }
 
   function isSpecial(format, type, serial, game = "yw2") {
-    return format === "yw1-jp" && type === "P1" && (serial === "ZZZZ" || (game === "yw3" && serial === "ZZZY"));
+    return format === "yw1-jp" && type === "P1" && (serial === "ZZZZ" || (["yw3", "busters"].includes(game) && serial === "ZZZY"));
   }
 
   function nextUnrecorded(format, type, serial, records, game = "yw2") {
@@ -61,16 +62,38 @@ const QRUsage = (() => {
 
   function groupRewards(rows, profile) {
     const groups = new Map();
+    let covered = [];
     rows.forEach((row, index) => {
       if (row.profile !== profile || row.start > row.end) return;
+      const ranges = [];
+      let cursor = row.start;
+      for (const [start, end] of covered) {
+        if (end < cursor) continue;
+        if (start > row.end) break;
+        if (start > cursor) ranges.push([cursor, Math.min(row.end, start - 1)]);
+        cursor = Math.max(cursor, end + 1);
+        if (cursor > row.end) break;
+      }
+      if (cursor <= row.end) ranges.push([cursor, row.end]);
+      const merged = [];
+      for (const range of [...covered, [row.start, row.end]].sort((a, b) => a[0] - b[0])) {
+        const previous = merged[merged.length - 1];
+        if (previous && range[0] <= previous[1] + 1) previous[1] = Math.max(previous[1], range[1]);
+        else merged.push([...range]);
+      }
+      covered = merged;
+      if (!ranges.length) return;
       const key = row.reward_group ?? row.item_id;
-      if (!groups.has(key)) groups.set(key, { ...row, index, ranges: [] });
-      groups.get(key).ranges.push([row.start, row.end]);
+      if (!groups.has(key)) {
+        const start = ranges[0][0];
+        groups.set(key, { ...row, start, qr_type: start.toString(36).toUpperCase().padStart(profile === "yw2" ? 3 : 2, "0"), index, ranges: [] });
+      }
+      groups.get(key).ranges.push(...ranges);
     });
     return [...groups.values()];
   }
 
-  return { STORAGE_KEY, PROFILE_IDS, SERIAL_LIMIT, profileIds, storageKey, keyFor, emptyStore, normalizeStore, shiftedSerial, isSpecial, nextUnrecorded, groupRewards };
+  return { STORAGE_KEY, PROFILE_IDS, SERIAL_LIMIT, profileIds, profileLabel, storageKey, keyFor, emptyStore, normalizeStore, shiftedSerial, isSpecial, nextUnrecorded, groupRewards };
 })();
 
 if (typeof module !== "undefined" && module.exports) module.exports = QRUsage;

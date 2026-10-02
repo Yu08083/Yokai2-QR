@@ -2,7 +2,7 @@
 
 const $ = (id) => document.getElementById(id);
 const game = document.documentElement.dataset.game || "yw2";
-const state = { catalog: null, format: null, tableVersion: "update", result: null, resultValid: false, series: null, usage: QRUsage.emptyStore(game), usageProfile: "save1", storageAvailable: true, template: null, templateFormat: null, sequence: 0, debounce: null, toastTimer: null, importing: false };
+const state = { catalog: null, format: null, tableVersion: "update", result: null, resultValid: false, series: null, usage: QRUsage.emptyStore(game), usageProfile: QRUsage.profileIds(game)[0], storageAvailable: true, template: null, templateFormat: null, sequence: 0, debounce: null, toastTimer: null, importing: false };
 
 async function api(path, data = {}) { return QRLocal.request(path, { ...data, game }); }
 
@@ -26,7 +26,7 @@ function loadUsage() {
     const profile = localStorage.getItem(`${game}-qr-usage-profile`);
     if (QRUsage.profileIds(game).includes(profile)) state.usageProfile = profile;
   } catch (_) { state.storageAvailable = false; }
-  $("usage-profile").replaceChildren(...QRUsage.profileIds(game).map((profile, index) => new Option(`セーブ${index + 1}`, profile)));
+  $("usage-profile").replaceChildren(...QRUsage.profileIds(game).map(profile => new Option(QRUsage.profileLabel(game, profile), profile)));
   $("usage-profile").value = state.usageProfile;
 }
 
@@ -137,7 +137,8 @@ function renderHistory() {
     const reward = activeRewards().find(row => row.profile === profile && row.start <= parseInt(type, 36) && row.end >= parseInt(type, 36));
     const item = document.createElement("li");
     const label = document.createElement("strong");
-    label.textContent = QRUsage.isSpecial(profile, type, serial, game) ? (serial === "ZZZZ" ? "ツチノコパンダ 特殊QR" : "引き継ぎ状態変更用の特殊QR") : reward ? QRLocal.rewardLabel(reward, state.catalog, state.tableVersion) : "ランダム報酬";
+    const special = state.catalog?.special_qrs?.find(row => row.serial === serial && row.qr_type === type && row.profile === profile);
+    label.textContent = QRUsage.isSpecial(profile, type, serial, game) ? special?.label || "特殊QR" : reward ? QRLocal.rewardLabel(reward, state.catalog, state.tableVersion) : "ランダム報酬";
     const code = document.createElement("span");
     code.className = "mono";
     code.textContent = `${profile === "yw2" ? "3桁形式" : "2桁形式"} · ${type} / ${serial}`;
@@ -289,7 +290,7 @@ function renderRewards() {
 
 function selectReward() {
   if ($("reward-select").value === "") return;
-  const reward = activeRewards()[Number($("reward-select").value)];
+  const reward = profileRewards().find(row => row.index === Number($("reward-select").value));
   const input = document.getElementById("field-qr_type");
   if (!reward || !input) return;
   input.value = reward.qr_type ?? reward.start;
@@ -301,13 +302,35 @@ function selectReward() {
   generate({ quiet: true });
 }
 
-function applyPandaPreset() {
+function applySpecialPreset(serial) {
   state.format = "yw1-jp";
   state.template = null;
   state.templateFormat = null;
   $("format-select").value = state.format;
-  renderFields({ qr_type: "P1", serial: "ZZZZ" });
+  renderFields({ qr_type: "P1", serial });
   generate({ quiet: true });
+}
+
+function initSpecialPresets() {
+  $("special-presets").replaceChildren();
+  for (const preset of state.catalog.special_qrs || []) {
+    const row = document.createElement("div");
+    row.className = "special-picker";
+    const text = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = preset.label;
+    const description = document.createElement("p");
+    description.textContent = preset.description;
+    const button = document.createElement("button");
+    button.className = "button secondary";
+    button.id = preset.serial === "ZZZZ" ? "panda-preset" : "zzzy-preset";
+    button.type = "button";
+    button.textContent = "表示";
+    button.addEventListener("click", () => applySpecialPreset(preset.serial));
+    text.append(title, description);
+    row.append(text, button);
+    $("special-presets").append(row);
+  }
 }
 
 function collectFields() {
@@ -448,7 +471,7 @@ async function importFile(file) {
       let project;
       try { project = JSON.parse(await file.text()); } catch (_) { throw new Error("JSONファイルの形式を読み取れませんでした。"); }
       if (!project || typeof project !== "object" || Array.isArray(project)) throw new Error("有効なプロジェクトファイルではありません。");
-      const projectGame = project.game || /^yw[23]-qr-editor$/.test(project.application || "") && project.application.slice(0, 3);
+      const projectGame = project.game || /^(yw[23]|busters)-qr-editor$/.exec(project.application || "")?.[1];
       if (projectGame && projectGame !== game) throw new Error("別の作品のQRデータです。対応する作品のエディターで開いてください。");
       ecc = ["L", "M", "Q", "H"].includes(project.ecc) ? project.ecc : $("ecc-select").value;
       const tableVersion = Object.hasOwn(state.catalog.versions, project.table_version) ? project.table_version : state.tableVersion;
@@ -625,7 +648,6 @@ function bindEvents() {
   $("version-select").addEventListener("change", () => changeTableVersion($("version-select").value));
   $("reward-search").addEventListener("input", renderRewards);
   $("reward-select").addEventListener("change", selectReward);
-  $("panda-preset").addEventListener("click", applyPandaPreset);
   $("ecc-select").addEventListener("change", markEdited);
   $("generate-button").addEventListener("click", () => generate());
   $("nav-import").addEventListener("click", openImport);
@@ -654,6 +676,7 @@ async function init() {
   $("generate-button").disabled = true;
   try {
     state.catalog = await api("/api/catalog");
+    initSpecialPresets();
     initPasswords();
     $("version-select").replaceChildren(...Object.entries(state.catalog.versions).map(([version, label]) => new Option(label, version)));
     const formats = (state.catalog.formats || []).filter((format) => format.id !== "raw");

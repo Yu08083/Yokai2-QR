@@ -75,7 +75,18 @@ const QRLocal = (() => {
     details["検証文字列"] = parsed.checksum_valid ? "一致" : "不一致";
     if (!parsed.checksum_valid) warnings.push("検証文字列が一致しません。生成し直すと再計算します。");
     if (!parsed.has_separator) warnings.push("URLの区切りがありません。ゲーム用には生成し直してください。");
-    if (parsed.profile === "yw1-jp" && fields.qr_type + fields.serial === "P1ZZZZ") {
+    if (catalog.game_id === "busters" && parsed.profile === "yw1-jp" && fields.qr_type === "P1" && ["ZZZZ", "ZZZY"].includes(fields.serial)) {
+      const special = catalog.special_qrs.find(row => row.serial === fields.serial);
+      details["表示名"] = special.label;
+      if (fields.serial === "ZZZZ" || ["update", "white-update"].includes(tableVersion)) {
+        details["特殊処理（認証成功時）"] = fields.serial === "ZZZZ" ? "専用フラグを設定" : "セーブ内の状態ビットと管理値を解除";
+        details["報酬"] = "アイテム付与なし（専用分岐）";
+        warnings.push("読み取り後は「使用済み」と表示される専用処理です。アイテムや妖怪を直接受け取るQRではありません。");
+        return { format: parsed.profile, fields, warnings, details };
+      }
+      warnings.push("この本体版にはP1ZZZYの専用処理がありません。通常の報酬判定に進みます。");
+    }
+    if (catalog.game_id !== "busters" && parsed.profile === "yw1-jp" && fields.qr_type + fields.serial === "P1ZZZZ") {
       details["特殊処理（認証成功時）"] = "ツチノコパンダのすれちがい送信開始フラグを設定";
       details["表示名"] = "ツチノコパンダ 特殊QR";
       details["報酬"] = "アイテム付与なし（専用分岐）";
@@ -97,6 +108,10 @@ const QRLocal = (() => {
       details["表示名"] = rewardLabel(reward, catalog, tableVersion);
       details["アイテムID"] = "0x" + reward.item_id.toString(16).toUpperCase().padStart(8, "0");
       if (reward.grants) details.grants = reward.grants;
+      if (catalog.game_id === "busters" && reward.grants?.length === 0) {
+        details.random_pool = table.random_pools?.[parsed.profile] || [];
+        warnings.push("このQRの受け取り内容はゲーム内で抽選されます。");
+      }
       if (reward.random_table) {
         const pools = table.named_random_pools;
         details.random_pool = pools?.[reward.random_table] || [];
@@ -172,7 +187,7 @@ const QRLocal = (() => {
     catalogPromise ||= fetch(new URL("./catalog.json", document.baseURI)).then(response => { if (!response.ok) throw new Error("アイテム一覧を読み込めませんでした。"); return response.json(); }).catch(error => { catalogPromise = null; throw error; });
     const rootCatalog = await catalogPromise;
     const game = data.game || "yw2";
-    if (!["yw2", "yw3"].includes(game)) throw new Error("対応していない作品です。");
+    if (!["yw2", "yw3", "busters"].includes(game)) throw new Error("対応していない作品です。");
     const catalog = rootCatalog.game_id === game || !rootCatalog.game_id && game === "yw2" ? rootCatalog : rootCatalog.games?.[game];
     if (!catalog) throw new Error("作品のアイテム一覧を読み込めませんでした。");
     if (route === "/api/catalog") return catalog;
