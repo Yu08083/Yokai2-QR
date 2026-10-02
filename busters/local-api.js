@@ -78,7 +78,7 @@ const QRLocal = (() => {
     if (catalog.game_id === "busters" && parsed.profile === "yw1-jp" && fields.qr_type === "P1" && ["ZZZZ", "ZZZY"].includes(fields.serial)) {
       const special = catalog.special_qrs.find(row => row.serial === fields.serial);
       details["表示名"] = special.label;
-      if (fields.serial === "ZZZZ" || ["update", "white-update"].includes(tableVersion)) {
+      if (fields.serial === "ZZZZ" || ["update", "white-update"].includes(catalog.version_tables?.[tableVersion] || tableVersion)) {
         details["特殊処理（認証成功時）"] = fields.serial === "ZZZZ" ? "専用フラグを設定" : "セーブ内の状態ビットと管理値を解除";
         details["報酬"] = "アイテム付与なし（専用分岐）";
         warnings.push("読み取り後は「使用済み」と表示される専用処理です。アイテムや妖怪を直接受け取るQRではありません。");
