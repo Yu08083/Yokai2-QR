@@ -47,7 +47,7 @@ const QRLocal = (() => {
     return Uint8Array.from(compact.match(/../g), byte => parseInt(byte, 16));
   }
 
-  function rewardLabel(reward, catalog, tableVersion = "update") {
+  function rewardLabel(reward, catalog, tableVersion = catalog.default_version || "update") {
     const pools = rewardTable(catalog, tableVersion).named_random_pools;
     const pool = pools?.[reward.random_table] || [];
     const family = pool[0]?.name?.split("・")[0];
@@ -55,7 +55,7 @@ const QRLocal = (() => {
     return reward.label || reward.name || "名称未確認";
   }
 
-  function rewardTable(catalog, tableVersion = "update") {
+  function rewardTable(catalog, tableVersion = catalog.default_version || "update") {
     const version = catalog.version_tables?.[tableVersion] || tableVersion;
     if (version === "update") return { rewards: catalog.rewards, named_random_pools: catalog.named_random_pools, random_pools: catalog.random_pools };
     if (version === "base") return { rewards: catalog.base_rewards, named_random_pools: catalog.base_named_random_pools, random_pools: catalog.random_pools };
@@ -64,7 +64,7 @@ const QRLocal = (() => {
     return table;
   }
 
-  function describe(payload, catalog, tableVersion = "update") {
+  function describe(payload, catalog, tableVersion = catalog.default_version || "update") {
     const table = rewardTable(catalog, tableVersion);
     const parsed = decode(payload);
     const warnings = [];
@@ -75,6 +75,17 @@ const QRLocal = (() => {
     details["検証文字列"] = parsed.checksum_valid ? "一致" : "不一致";
     if (!parsed.checksum_valid) warnings.push("検証文字列が一致しません。生成し直すと再計算します。");
     if (!parsed.has_separator) warnings.push("URLの区切りがありません。ゲーム用には生成し直してください。");
+    if (catalog.game_id === "busters2") {
+      const special = catalog.special_qrs?.find(row => row.profile === parsed.profile && row.qr_type === fields.qr_type && row.serial === fields.serial);
+      if (special) {
+        const effect = special.version_effects?.[tableVersion];
+        details["表示名"] = special.label;
+        details["特殊処理（認証成功時）"] = effect || "この版の特殊処理は未確認";
+        details["報酬"] = effect ? "アイテム付与なし（専用分岐）" : "特殊QR（受け取り内容未確認）";
+        warnings.push(effect ? "アイテムや妖怪を直接受け取るQRではありません。" : "この版での特殊QRの効果は未確認です。");
+        return { format: parsed.profile, fields, warnings, details };
+      }
+    }
     if (catalog.game_id === "busters" && parsed.profile === "yw1-jp" && fields.qr_type === "P1" && ["ZZZZ", "ZZZY"].includes(fields.serial)) {
       const special = catalog.special_qrs.find(row => row.serial === fields.serial);
       details["表示名"] = special.label;
@@ -86,7 +97,7 @@ const QRLocal = (() => {
       }
       warnings.push("この本体版にはP1ZZZYの専用処理がありません。通常の報酬判定に進みます。");
     }
-    if (catalog.game_id !== "busters" && parsed.profile === "yw1-jp" && fields.qr_type + fields.serial === "P1ZZZZ") {
+    if (["yw2", "yw3"].includes(catalog.game_id) && parsed.profile === "yw1-jp" && fields.qr_type + fields.serial === "P1ZZZZ") {
       details["特殊処理（認証成功時）"] = "ツチノコパンダのすれちがい送信開始フラグを設定";
       details["表示名"] = "ツチノコパンダ 特殊QR";
       details["報酬"] = "アイテム付与なし（専用分岐）";
@@ -104,11 +115,18 @@ const QRLocal = (() => {
     const number = parseInt(fields.qr_type, 36);
     const reward = rows.find(row => row.profile === parsed.profile && row.start <= number && number <= row.end);
     if (reward) {
+      if (reward.selectable === false) {
+        details["表示名"] = "受取対象外（旧データ）";
+        details["報酬"] = "受取対象外（旧データ）";
+        details["受け取り可否"] = "受け取り不可";
+        warnings.push(reward.unsupported_reason || "このQRの報酬は、このゲームの受け取り対象ではありません。");
+        return { format: parsed.profile, fields, warnings, details };
+      }
       details["報酬"] = reward.label || reward.name;
       details["表示名"] = rewardLabel(reward, catalog, tableVersion);
       details["アイテムID"] = "0x" + reward.item_id.toString(16).toUpperCase().padStart(8, "0");
       if (reward.grants) details.grants = reward.grants;
-      if (catalog.game_id === "busters" && reward.grants?.length === 0) {
+      if (["busters", "busters2"].includes(catalog.game_id) && reward.grants?.length === 0 && !reward.random_table) {
         details.random_pool = table.random_pools?.[parsed.profile] || [];
         warnings.push("このQRの受け取り内容はゲーム内で抽選されます。");
       }
@@ -134,7 +152,7 @@ const QRLocal = (() => {
     return qr;
   }
 
-  function render(payload, catalog, ecc = "M", tableVersion = "update") {
+  function render(payload, catalog, ecc = "M", tableVersion = catalog.default_version || "update") {
     const qr = makeQR(payload, ecc);
     const count = qr.getModuleCount();
     const size = (count + 8) * 8;
@@ -187,7 +205,7 @@ const QRLocal = (() => {
     catalogPromise ||= fetch(new URL("./catalog.json", document.baseURI)).then(response => { if (!response.ok) throw new Error("アイテム一覧を読み込めませんでした。"); return response.json(); }).catch(error => { catalogPromise = null; throw error; });
     const rootCatalog = await catalogPromise;
     const game = data.game || "yw2";
-    if (!["yw2", "yw3", "busters"].includes(game)) throw new Error("対応していない作品です。");
+    if (!["yw2", "yw3", "busters", "busters2"].includes(game)) throw new Error("対応していない作品です。");
     const catalog = rootCatalog.game_id === game || !rootCatalog.game_id && game === "yw2" ? rootCatalog : rootCatalog.games?.[game];
     if (!catalog) throw new Error("作品のアイテム一覧を読み込めませんでした。");
     if (route === "/api/catalog") return catalog;
@@ -200,7 +218,7 @@ const QRLocal = (() => {
       }
     } else if (route === "/api/decode") payload = data.hex !== undefined ? parseHex(data.hex) : await readImage(data.image);
     else throw new Error("対応していない操作です。");
-    return render(payload, catalog, data.ecc || "M", data.table_version || "update");
+    return render(payload, catalog, data.ecc || "M", data.table_version || catalog.default_version || "update");
   }
 
   return { encode, decode, checksum, parseHex, rewardTable, rewardLabel, describe, makeQR, readImage, request };

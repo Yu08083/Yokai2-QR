@@ -107,6 +107,9 @@ main { max-width: 1200px; margin: auto; padding: 24px; }
 #version-select { max-width: 100%; }
 html[data-game="yw3"] .format-field { margin-top: 20px; }
 .page-footer { display: flex; justify-content: space-between; gap: 14px; padding: 20px 0 0; color: var(--muted); font-size: 11px; line-height: 1.8; }
+.game-nav { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px 24px; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 12px; }
+.game-nav a { color: var(--muted); text-underline-offset: 3px; }
+.game-nav a[aria-current="page"] { color: var(--ink); text-decoration: none; }
 .status-message { position: fixed; z-index: 30; bottom: 20px; left: 50%; transform: translateX(-50%); max-width: calc(100vw - 32px); border: 1px solid #3c3933; background: #3c3933; color: #fff; border-radius: 4px; padding: 12px 18px; font-size: 13px; line-height: 1.8; }
 .status-message.error { background: #8b3b32; border-color: #8b3b32; }
 dialog { width: min(500px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; border: 1px solid #bcb7ae; border-radius: 4px; padding: 24px; color: var(--ink); background: #fff; }

@@ -6,8 +6,8 @@ const QRUsage = (() => {
   const PROFILE_IDS = ["save1", "save2", "save3"];
   const validKey = /^(yw2:[0-9A-Z]{3}|yw1-jp:[0-9A-Z]{2}):[0-9A-Z]{4}$/;
 
-  function profileIds(game = "yw2") { return game === "busters" ? ["red1", "red2", "red3", "white1", "white2", "white3"] : game === "yw3" ? PROFILE_IDS.slice(0, 2) : PROFILE_IDS; }
-  function profileLabel(game, profile) { return game === "busters" ? `${profile.startsWith("red") ? "赤猫団" : "白犬隊"}・セーブ${profile.slice(-1)}` : `セーブ${profile.slice(-1)}`; }
+  function profileIds(game = "yw2") { return game === "busters2" ? ["sword1", "sword2", "magnum1", "magnum2"] : game === "busters" ? ["red1", "red2", "red3", "white1", "white2", "white3"] : game === "yw3" ? PROFILE_IDS.slice(0, 2) : PROFILE_IDS; }
+  function profileLabel(game, profile) { return game === "busters2" ? `${profile.startsWith("sword") ? "ソード" : "マグナム"}・セーブ${profile.slice(-1)}` : game === "busters" ? `${profile.startsWith("red") ? "赤猫団" : "白犬隊"}・セーブ${profile.slice(-1)}` : `セーブ${profile.slice(-1)}`; }
   function storageKey(game = "yw2") { return game === "yw2" ? STORAGE_KEY : `${game}-qr-usage-v1`; }
 
   function keyFor(result) {
@@ -46,7 +46,7 @@ const QRUsage = (() => {
   }
 
   function isSpecial(format, type, serial, game = "yw2") {
-    return format === "yw1-jp" && type === "P1" && (serial === "ZZZZ" || (["yw3", "busters"].includes(game) && serial === "ZZZY"));
+    return ["yw2", "yw3", "busters", "busters2"].includes(game) && format === "yw1-jp" && type === "P1" && (serial === "ZZZZ" || (["yw3", "busters", "busters2"].includes(game) && serial === "ZZZY"));
   }
 
   function nextUnrecorded(format, type, serial, records, game = "yw2") {
@@ -82,7 +82,7 @@ const QRUsage = (() => {
         else merged.push([...range]);
       }
       covered = merged;
-      if (!ranges.length) return;
+      if (!ranges.length || row.selectable === false) return;
       const key = row.reward_group ?? row.item_id;
       if (!groups.has(key)) {
         const start = ranges[0][0];

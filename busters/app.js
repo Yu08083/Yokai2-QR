@@ -40,6 +40,16 @@ function saveUsage() {
   }
 }
 
+function matchUsageEdition(version) {
+  if (game !== "busters2") return;
+  const edition = version.split("-")[0];
+  const profile = edition + state.usageProfile.slice(-1);
+  if (!QRUsage.profileIds(game).includes(profile) || profile === state.usageProfile) return;
+  state.usageProfile = profile;
+  $("usage-profile").value = profile;
+  saveUsage();
+}
+
 function saveSession() {
   if (!state.resultValid) return;
   try {
@@ -270,6 +280,13 @@ function renderFields(values) {
   $("template-note").hidden = !(state.template && state.templateFormat === state.format);
   $("reward-search").value = "";
   renderRewards();
+  if (game === "busters2" && !values && !profileRewards().length) {
+    const preset = state.catalog.special_qrs?.find(row => row.profile === state.format && row.version_effects?.[state.tableVersion]);
+    if (preset) {
+      $("field-qr_type").value = preset.qr_type;
+      $("field-serial").value = preset.serial;
+    }
+  }
 }
 
 function profileRewards() {
@@ -278,13 +295,20 @@ function profileRewards() {
 
 function renderRewards() {
   const rewards = profileRewards();
+  const labels = new Map();
+  for (const reward of rewards) {
+    const label = QRLocal.rewardLabel(reward, state.catalog, state.tableVersion);
+    labels.set(label, (labels.get(label) || 0) + 1);
+  }
   $("reward-picker").hidden = !rewards.length;
   const search = $("reward-search").value.trim().normalize("NFKC").toLocaleLowerCase();
   const filtered = rewards.filter((reward) => [reward.label, reward.qr_type, reward.start, reward.end, reward.item_id].some((value) => String(value ?? "").normalize("NFKC").toLocaleLowerCase().includes(search)));
   $("reward-count").textContent = `${filtered.length} / ${rewards.length} 種類`;
   $("reward-select").replaceChildren(new Option(filtered.length ? "一覧から選択" : "一致する候補がありません", ""));
   filtered.forEach((reward) => {
-    $("reward-select").append(new Option(QRLocal.rewardLabel(reward, state.catalog, state.tableVersion), String(reward.index)));
+    const label = QRLocal.rewardLabel(reward, state.catalog, state.tableVersion);
+    const choiceLabel = game === "busters2" && labels.get(label) > 1 ? `${label}（種類 ${reward.qr_type}）` : label;
+    $("reward-select").append(new Option(choiceLabel, String(reward.index)));
   });
 }
 
@@ -302,12 +326,12 @@ function selectReward() {
   generate({ quiet: true });
 }
 
-function applySpecialPreset(serial) {
-  state.format = "yw1-jp";
+function applySpecialPreset(preset) {
+  state.format = preset.profile;
   state.template = null;
   state.templateFormat = null;
   $("format-select").value = state.format;
-  renderFields({ qr_type: "P1", serial });
+  renderFields({ qr_type: preset.qr_type, serial: preset.serial });
   generate({ quiet: true });
 }
 
@@ -326,7 +350,7 @@ function initSpecialPresets() {
     button.id = preset.serial === "ZZZZ" ? "panda-preset" : "zzzy-preset";
     button.type = "button";
     button.textContent = "表示";
-    button.addEventListener("click", () => applySpecialPreset(preset.serial));
+    button.addEventListener("click", () => applySpecialPreset(preset));
     text.append(title, description);
     row.append(text, button);
     $("special-presets").append(row);
@@ -437,7 +461,9 @@ async function applyDecoded(decoded, ecc) {
   if (!format || format.id === "raw") throw new Error("対応するゲーム用QRではありません。");
   if (!decoded.hex) throw new Error("QRデータを読み取れませんでした。");
   if (Object.hasOwn(state.catalog.versions, decoded.table_version)) {
+    const changed = state.tableVersion !== decoded.table_version;
     state.tableVersion = decoded.table_version;
+    if (changed) matchUsageEdition(state.tableVersion);
     $("version-select").value = state.tableVersion;
     $("password-version").value = state.tableVersion;
     renderPasswordRewards();
@@ -471,7 +497,7 @@ async function importFile(file) {
       let project;
       try { project = JSON.parse(await file.text()); } catch (_) { throw new Error("JSONファイルの形式を読み取れませんでした。"); }
       if (!project || typeof project !== "object" || Array.isArray(project)) throw new Error("有効なプロジェクトファイルではありません。");
-      const projectGame = project.game || /^(yw[23]|busters)-qr-editor$/.exec(project.application || "")?.[1];
+      const projectGame = project.game || /^(yw[23]|busters2?)-qr-editor$/.exec(project.application || "")?.[1];
       if (projectGame && projectGame !== game) throw new Error("別の作品のQRデータです。対応する作品のエディターで開いてください。");
       ecc = ["L", "M", "Q", "H"].includes(project.ecc) ? project.ecc : $("ecc-select").value;
       const tableVersion = Object.hasOwn(state.catalog.versions, project.table_version) ? project.table_version : state.tableVersion;
@@ -587,7 +613,7 @@ function renderPasswords() {
 
 function initPasswords() {
   $("password-version").replaceChildren(...Object.entries(state.catalog.versions).map(([version, label]) => new Option(label, version)));
-  $("password-alias-option").hidden = !state.catalog.password_aliases;
+  $("password-alias-option").hidden = !Object.values(state.catalog.password_aliases || {}).some(rows => rows.length);
   const sources = state.catalog.password_sources || [];
   $("password-sources").replaceChildren();
   $("password-sources").hidden = !sources.length;
@@ -606,7 +632,9 @@ function initPasswords() {
 }
 
 function changeTableVersion(version) {
+  const changed = state.tableVersion !== version;
   state.tableVersion = version;
+  if (changed) matchUsageEdition(version);
   $("version-select").value = version;
   $("password-version").value = version;
   renderRewards();
@@ -644,7 +672,7 @@ function bindEvents() {
   $("drop-zone").setAttribute("role", "button");
   $("file-input").tabIndex = -1;
   $("drop-zone").addEventListener("keydown", (event) => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); $("file-input").click(); } });
-  $("format-select").addEventListener("change", () => { state.format = $("format-select").value; state.template = null; state.templateFormat = null; renderFields(); invalidateResult(); });
+  $("format-select").addEventListener("change", () => { state.format = $("format-select").value; state.template = null; state.templateFormat = null; renderFields(); invalidateResult(); if (game === "busters2" && !profileRewards().length && state.catalog.special_qrs?.some(row => row.profile === state.format && row.qr_type === $("field-qr_type").value && row.serial === $("field-serial").value && row.version_effects?.[state.tableVersion])) generate({ quiet: true }); });
   $("version-select").addEventListener("change", () => changeTableVersion($("version-select").value));
   $("reward-search").addEventListener("input", renderRewards);
   $("reward-select").addEventListener("change", selectReward);
@@ -676,9 +704,13 @@ async function init() {
   $("generate-button").disabled = true;
   try {
     state.catalog = await api("/api/catalog");
+    state.tableVersion = state.catalog.default_version || (Object.hasOwn(state.catalog.versions, "update") ? "update" : Object.keys(state.catalog.versions)[0]);
     initSpecialPresets();
     initPasswords();
     $("version-select").replaceChildren(...Object.entries(state.catalog.versions).map(([version, label]) => new Option(label, version)));
+    $("version-select").value = state.tableVersion;
+    $("password-version").value = state.tableVersion;
+    renderPasswordRewards();
     const formats = (state.catalog.formats || []).filter((format) => format.id !== "raw");
     $("format-select").replaceChildren();
     formats.forEach((format) => { const option = document.createElement("option"); option.value = format.id; option.textContent = format.label || format.id; $("format-select").append(option); });
@@ -692,6 +724,10 @@ async function init() {
     if (formats.length) {
       state.format = formats[0].id;
       renderFields();
+      if (game === "busters2") {
+        const first = profileRewards()[0];
+        if (first) $("field-qr_type").value = first.qr_type;
+      }
       let session;
       try { session = JSON.parse(localStorage.getItem(`${game}-qr-session-v1`)); } catch (_) {  }
       if (session?.application === `${game}-qr-editor` && session.version === 1 && typeof session.hex === "string") {
