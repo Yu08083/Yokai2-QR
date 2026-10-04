@@ -504,7 +504,7 @@ async function importFile(file) {
       let project;
       try { project = JSON.parse(await file.text()); } catch (_) { throw new Error("JSONファイルの形式を読み取れませんでした。"); }
       if (!project || typeof project !== "object" || Array.isArray(project)) throw new Error("有効なプロジェクトファイルではありません。");
-      const projectGame = project.game || /^(yw[23]|busters2?)-qr-editor$/.exec(project.application || "")?.[1];
+      const projectGame = project.game || /^(yw[123]|busters2?)-qr-editor$/.exec(project.application || "")?.[1];
       if (projectGame && projectGame !== game) throw new Error("別の作品のQRデータです。対応する作品のエディターで開いてください。");
       ecc = ["L", "M", "Q", "H"].includes(project.ecc) ? project.ecc : $("ecc-select").value;
       const tableVersion = Object.hasOwn(state.catalog.versions, project.table_version) ? project.table_version : state.tableVersion;

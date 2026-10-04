@@ -78,12 +78,13 @@ const QRLocal = (() => {
     const warnings = [];
     const details = { payload: [...payload].map(byte => byte < 128 ? String.fromCharCode(byte) : "\\x" + byte.toString(16).padStart(2, "0")).join(""), "報酬表": catalog.versions?.[tableVersion] || (tableVersion === "update" ? "更新版" : "本体版") };
     if (!parsed) return { format: "raw", fields: {}, warnings: ["対応するゲーム用QRの形式ではありません。"], details };
+    if (catalog.game_id === "yw1" && !catalog.formats.some(format => format.id === parsed.profile)) return { format: "raw", fields: {}, warnings: ["妖怪ウォッチ（初代）用のQR形式ではありません。"], details };
     const fields = { qr_type: parsed.qr_type, serial: parsed.serial };
     details.checksum_valid = parsed.checksum_valid;
     details["検証文字列"] = parsed.checksum_valid ? "一致" : "不一致";
     if (!parsed.checksum_valid) warnings.push("検証文字列が一致しません。生成し直すと再計算します。");
     if (!parsed.has_separator) warnings.push("URLの区切りがありません。ゲーム用には生成し直してください。");
-    if (catalog.game_id === "busters2") {
+    if (["yw1", "busters2"].includes(catalog.game_id)) {
       const special = catalog.special_qrs?.find(row => row.profile === parsed.profile && row.qr_type === fields.qr_type && row.serial === fields.serial);
       if (special) {
         const effect = special.version_effects?.[tableVersion];
@@ -211,15 +212,16 @@ const QRLocal = (() => {
   }
 
   async function request(route, data = {}) {
-    catalogPromise ||= fetch(new URL("./catalog.json?v=20261005-1", document.baseURI)).then(response => { if (!response.ok) throw new Error("アイテム一覧を読み込めませんでした。"); return response.json(); }).catch(error => { catalogPromise = null; throw error; });
+    catalogPromise ||= fetch(new URL("./catalog.json?v=20261005-2", document.baseURI)).then(response => { if (!response.ok) throw new Error("アイテム一覧を読み込めませんでした。"); return response.json(); }).catch(error => { catalogPromise = null; throw error; });
     const rootCatalog = await catalogPromise;
     const game = data.game || "yw2";
-    if (!["yw2", "yw3", "busters", "busters2"].includes(game)) throw new Error("対応していない作品です。");
+    if (!["yw1", "yw2", "yw3", "busters", "busters2"].includes(game)) throw new Error("対応していない作品です。");
     const catalog = rootCatalog.game_id === game || !rootCatalog.game_id && game === "yw2" ? rootCatalog : rootCatalog.games?.[game];
     if (!catalog) throw new Error("作品のアイテム一覧を読み込めませんでした。");
     if (route === "/api/catalog") return catalog;
     let payload;
     if (route === "/api/generate") {
+      if (game === "yw1" && data.format !== "raw" && !catalog.formats.some(format => format.id === data.format)) throw new Error("妖怪ウォッチ（初代）用のQR形式ではありません。");
       payload = data.format === "raw" ? parseHex(data.hex) : encode(data.format, data.fields?.qr_type, data.fields?.serial);
       if (data.template_hex && data.format !== "raw") {
         const template = decode(parseHex(data.template_hex));
