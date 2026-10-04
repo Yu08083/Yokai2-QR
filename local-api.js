@@ -104,6 +104,13 @@ const QRLocal = (() => {
       warnings.push(catalog.game_id === "yw3" ? "読み取り後、さすらい荘で登録・更新し、別の3DSとすれちがってください。QRを読んだ本体へ直接出現させるものではありません。" : "読み取り後、さすらい荘で登録・更新し、別の3DSとすれちがってください。「使用済み」と表示されても送信準備が進む処理です。受信側での出現報告があります。");
       return { format: parsed.profile, fields, warnings, details };
     }
+    if (catalog.game_id === "yw2" && parsed.profile === "yw1-jp" && fields.qr_type + fields.serial === "P1ZZZY") {
+      details["表示名"] = "引き継ぎ回数リセット";
+      details["効果（実機報告）"] = "再引き継ぎ可能";
+      details["報酬"] = "引き継ぎ回数リセット（実機報告）";
+      warnings.push("妖怪ウォッチ2で再引き継ぎできた実機報告があります。対応版の詳細は確認中です。");
+      return { format: parsed.profile, fields, warnings, details };
+    }
     if (catalog.game_id === "yw3" && parsed.profile === "yw1-jp" && fields.qr_type + fields.serial === "P1ZZZY") {
       details["表示名"] = "引き継ぎ回数リセット";
       details["特殊処理（認証成功時）"] = tableVersion === "update" ? "引き継ぎ済み状態を解除" : tableVersion === "base" ? "専用分岐あり・状態変更なし" : "この版の特殊処理は未確認";

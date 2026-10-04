@@ -46,7 +46,7 @@ const QRUsage = (() => {
   }
 
   function isSpecial(format, type, serial, game = "yw2") {
-    return ["yw2", "yw3", "busters", "busters2"].includes(game) && format === "yw1-jp" && type === "P1" && (serial === "ZZZZ" || (["yw3", "busters", "busters2"].includes(game) && serial === "ZZZY"));
+    return ["yw2", "yw3", "busters", "busters2"].includes(game) && format === "yw1-jp" && type === "P1" && ["ZZZZ", "ZZZY"].includes(serial);
   }
 
   function nextUnrecorded(format, type, serial, records, game = "yw2") {
