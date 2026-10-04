@@ -47,6 +47,13 @@ const QRLocal = (() => {
     return Uint8Array.from(compact.match(/../g), byte => parseInt(byte, 16));
   }
 
+  function assertAllowed(payload, catalog) {
+    if ((catalog.game_id || "yw2") !== "yw2") return;
+    const text = String.fromCharCode(...payload);
+    const code = text.slice(text.lastIndexOf("/") + 1);
+    if (code.length === 32 && code.slice(0, 6).toUpperCase() === "P1ZZZY") throw new Error("このQRは妖怪ウォッチ2では表示・生成できません。");
+  }
+
   function rewardLabel(reward, catalog, tableVersion = catalog.default_version || "update") {
     const pools = rewardTable(catalog, tableVersion).named_random_pools;
     const pool = pools?.[reward.random_table] || [];
@@ -65,6 +72,7 @@ const QRLocal = (() => {
   }
 
   function describe(payload, catalog, tableVersion = catalog.default_version || "update") {
+    assertAllowed(payload, catalog);
     const table = rewardTable(catalog, tableVersion);
     const parsed = decode(payload);
     const warnings = [];
@@ -153,6 +161,7 @@ const QRLocal = (() => {
   }
 
   function render(payload, catalog, ecc = "M", tableVersion = catalog.default_version || "update") {
+    assertAllowed(payload, catalog);
     const qr = makeQR(payload, ecc);
     const count = qr.getModuleCount();
     const size = (count + 8) * 8;
@@ -202,7 +211,7 @@ const QRLocal = (() => {
   }
 
   async function request(route, data = {}) {
-    catalogPromise ||= fetch(new URL("./catalog.json", document.baseURI)).then(response => { if (!response.ok) throw new Error("アイテム一覧を読み込めませんでした。"); return response.json(); }).catch(error => { catalogPromise = null; throw error; });
+    catalogPromise ||= fetch(new URL("./catalog.json?v=20261005-1", document.baseURI)).then(response => { if (!response.ok) throw new Error("アイテム一覧を読み込めませんでした。"); return response.json(); }).catch(error => { catalogPromise = null; throw error; });
     const rootCatalog = await catalogPromise;
     const game = data.game || "yw2";
     if (!["yw2", "yw3", "busters", "busters2"].includes(game)) throw new Error("対応していない作品です。");
@@ -221,7 +230,7 @@ const QRLocal = (() => {
     return render(payload, catalog, data.ecc || "M", data.table_version || catalog.default_version || "update");
   }
 
-  return { encode, decode, checksum, parseHex, rewardTable, rewardLabel, describe, makeQR, readImage, request };
+  return { encode, decode, checksum, parseHex, assertAllowed, rewardTable, rewardLabel, describe, makeQR, readImage, request };
 })();
 
 if (typeof module === "object" && module.exports) module.exports = QRLocal;

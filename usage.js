@@ -10,8 +10,9 @@ const QRUsage = (() => {
   function profileLabel(game, profile) { return game === "busters2" ? `${profile.startsWith("sword") ? "ソード" : "マグナム"}・セーブ${profile.slice(-1)}` : game === "busters" ? `${profile.startsWith("red") ? "赤猫団" : "白犬隊"}・セーブ${profile.slice(-1)}` : `セーブ${profile.slice(-1)}`; }
   function storageKey(game = "yw2") { return game === "yw2" ? STORAGE_KEY : `${game}-qr-usage-v1`; }
 
-  function keyFor(result) {
+  function keyFor(result, game = result?.game || "yw2") {
     if (!result || result.details?.checksum_valid !== true) return null;
+    if (isBlocked(result.format, result.fields?.qr_type, result.fields?.serial, game)) return null;
     const key = `${result.format}:${result.fields?.qr_type}:${result.fields?.serial}`;
     return validKey.test(key) ? key : null;
   }
@@ -32,6 +33,7 @@ const QRUsage = (() => {
       for (const [key, timestamp] of Object.entries(records)) {
         if (!validKey.test(key) || typeof timestamp !== "string" || !Number.isFinite(Date.parse(timestamp))) throw new Error("使用メモに不正なQRの記録があります。");
         if (++count > 100000) throw new Error("使用メモは10万件以下にしてください。");
+        if (isBlocked(...key.split(":"), game)) continue;
         store.profiles[profile][key] = timestamp;
       }
     }
@@ -46,13 +48,18 @@ const QRUsage = (() => {
   }
 
   function isSpecial(format, type, serial, game = "yw2") {
-    return ["yw2", "yw3", "busters", "busters2"].includes(game) && format === "yw1-jp" && type === "P1" && ["ZZZZ", "ZZZY"].includes(serial);
+    return ["yw2", "yw3", "busters", "busters2"].includes(game) && format === "yw1-jp" && type === "P1" && (serial === "ZZZZ" || game !== "yw2" && serial === "ZZZY");
+  }
+
+  function isBlocked(format, type, serial, game = "yw2") {
+    return game === "yw2" && format === "yw1-jp" && String(type).toUpperCase() === "P1" && String(serial).toUpperCase() === "ZZZY";
   }
 
   function nextUnrecorded(format, type, serial, records, game = "yw2") {
-    if (isSpecial(format, type, serial, game)) return null;
+    if (isSpecial(format, type, serial, game) || isBlocked(format, type, serial, game)) return null;
     let next = shiftedSerial(serial, 1);
     while (next) {
+      if (isBlocked(format, type, next, game)) { next = shiftedSerial(next, 1); continue; }
       if (isSpecial(format, type, next, game)) return null;
       if (!Object.hasOwn(records, `${format}:${type}:${next}`)) return next;
       next = shiftedSerial(next, 1);
@@ -93,7 +100,7 @@ const QRUsage = (() => {
     return [...groups.values()];
   }
 
-  return { STORAGE_KEY, PROFILE_IDS, SERIAL_LIMIT, profileIds, profileLabel, storageKey, keyFor, emptyStore, normalizeStore, shiftedSerial, isSpecial, nextUnrecorded, groupRewards };
+  return { STORAGE_KEY, PROFILE_IDS, SERIAL_LIMIT, profileIds, profileLabel, storageKey, keyFor, emptyStore, normalizeStore, shiftedSerial, isSpecial, isBlocked, nextUnrecorded, groupRewards };
 })();
 
 if (typeof module !== "undefined" && module.exports) module.exports = QRUsage;

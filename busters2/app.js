@@ -22,7 +22,10 @@ function usageRecords() { return state.usage.profiles[state.usageProfile]; }
 function loadUsage() {
   try {
     const saved = localStorage.getItem(QRUsage.storageKey(game));
-    if (saved) state.usage = QRUsage.normalizeStore(JSON.parse(saved), game);
+    if (saved) {
+      state.usage = QRUsage.normalizeStore(JSON.parse(saved), game);
+      if (game === "yw2") localStorage.setItem(QRUsage.storageKey(game), JSON.stringify(state.usage));
+    }
     const profile = localStorage.getItem(`${game}-qr-usage-profile`);
     if (QRUsage.profileIds(game).includes(profile)) state.usageProfile = profile;
   } catch (_) { state.storageAvailable = false; }
@@ -98,8 +101,9 @@ function nextSerial(skipRecorded) {
   const result = state.result;
   if (!state.resultValid || !QRUsage.keyFor(result) || result.format === "raw") return null;
   const { qr_type: type, serial } = result.fields;
-  if (QRUsage.isSpecial(result.format, type, serial, game)) return null;
-  const next = skipRecorded ? QRUsage.nextUnrecorded(result.format, type, serial, usageRecords(), game) : QRUsage.shiftedSerial(serial, 1);
+  if (QRUsage.isSpecial(result.format, type, serial, game) || QRUsage.isBlocked(result.format, type, serial, game)) return null;
+  let next = skipRecorded ? QRUsage.nextUnrecorded(result.format, type, serial, usageRecords(), game) : QRUsage.shiftedSerial(serial, 1);
+  while (next && QRUsage.isBlocked(result.format, type, next, game)) next = QRUsage.shiftedSerial(next, 1);
   return QRUsage.isSpecial(result.format, type, next, game) ? null : next;
 }
 
@@ -338,6 +342,7 @@ function applySpecialPreset(preset) {
 function initSpecialPresets() {
   $("special-presets").replaceChildren();
   for (const preset of state.catalog.special_qrs || []) {
+    if (QRUsage.isBlocked(preset.profile, preset.qr_type, preset.serial, game)) continue;
     const row = document.createElement("div");
     row.className = "special-picker";
     const text = document.createElement("div");
@@ -393,6 +398,8 @@ function invalidateResult() {
 function markEdited() { state.series = null; invalidateResult(); }
 
 function renderResult(result) {
+  if (typeof result.hex === "string") QRLocal.assertAllowed(QRLocal.parseHex(result.hex), state.catalog);
+  if (QRUsage.isBlocked(result.format, result.fields?.qr_type, result.fields?.serial, game)) throw new Error("このQRは妖怪ウォッチ2では表示・生成できません。");
   state.result = result;
   state.resultValid = true;
   if (QRUsage.keyFor(result) && (!state.series || state.series.format !== result.format || state.series.type !== result.fields.qr_type)) state.series = { format: result.format, type: result.fields.qr_type, start: parseInt(result.fields.serial, 36) };
