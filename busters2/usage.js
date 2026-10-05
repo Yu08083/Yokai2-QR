@@ -12,6 +12,7 @@ const QRUsage = (() => {
 
   function keyFor(result, game = result?.game || "yw2") {
     if (!result || result.details?.checksum_valid !== true) return null;
+    if (game === "sangokushi" && result.details["受け取り可否"] === "受け取り不可") return null;
     if (isBlocked(result.format, result.fields?.qr_type, result.fields?.serial, game)) return null;
     const key = `${result.format}:${result.fields?.qr_type}:${result.fields?.serial}`;
     return validKey.test(key) ? key : null;

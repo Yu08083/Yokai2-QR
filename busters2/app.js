@@ -152,7 +152,7 @@ function renderHistory() {
     const item = document.createElement("li");
     const label = document.createElement("strong");
     const special = state.catalog?.special_qrs?.find(row => row.serial === serial && row.qr_type === type && row.profile === profile);
-    label.textContent = QRUsage.isSpecial(profile, type, serial, game) ? special?.label || "特殊QR" : reward ? QRLocal.rewardLabel(reward, state.catalog, state.tableVersion) : "ランダム報酬";
+    label.textContent = QRUsage.isSpecial(profile, type, serial, game) ? special?.label || "特殊QR" : reward?.selectable === false && game === "sangokushi" ? "受取対象外" : reward ? QRLocal.rewardLabel(reward, state.catalog, state.tableVersion) : game === "sangokushi" ? state.catalog.fallback?.label || "受取対象外" : "ランダム報酬";
     const code = document.createElement("span");
     code.className = "mono";
     code.textContent = `${profile === "yw2" ? "3桁形式" : "2桁形式"} · ${type} / ${serial}`;
@@ -504,7 +504,7 @@ async function importFile(file) {
       let project;
       try { project = JSON.parse(await file.text()); } catch (_) { throw new Error("JSONファイルの形式を読み取れませんでした。"); }
       if (!project || typeof project !== "object" || Array.isArray(project)) throw new Error("有効なプロジェクトファイルではありません。");
-      const projectGame = project.game || /^(yw[123]|busters2?)-qr-editor$/.exec(project.application || "")?.[1];
+      const projectGame = project.game || /^(yw[123]|sangokushi|busters2?)-qr-editor$/.exec(project.application || "")?.[1];
       if (projectGame && projectGame !== game) throw new Error("別の作品のQRデータです。対応する作品のエディターで開いてください。");
       ecc = ["L", "M", "Q", "H"].includes(project.ecc) ? project.ecc : $("ecc-select").value;
       const tableVersion = Object.hasOwn(state.catalog.versions, project.table_version) ? project.table_version : state.tableVersion;

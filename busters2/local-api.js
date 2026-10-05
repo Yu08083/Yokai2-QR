@@ -78,7 +78,8 @@ const QRLocal = (() => {
     const warnings = [];
     const details = { payload: [...payload].map(byte => byte < 128 ? String.fromCharCode(byte) : "\\x" + byte.toString(16).padStart(2, "0")).join(""), "報酬表": catalog.versions?.[tableVersion] || (tableVersion === "update" ? "更新版" : "本体版") };
     if (!parsed) return { format: "raw", fields: {}, warnings: ["対応するゲーム用QRの形式ではありません。"], details };
-    if (catalog.game_id === "yw1" && !catalog.formats.some(format => format.id === parsed.profile)) return { format: "raw", fields: {}, warnings: ["妖怪ウォッチ（初代）用のQR形式ではありません。"], details };
+    if (["yw1", "sangokushi"].includes(catalog.game_id) && !catalog.formats.some(format => format.id === parsed.profile)) return { format: "raw", fields: {}, warnings: [catalog.game_id === "yw1" ? "妖怪ウォッチ（初代）用のQR形式ではありません。" : "妖怪三国志用のQR形式ではありません。"], details };
+    if (catalog.game_id === "sangokushi" && (!parsed.has_separator || parsed.uri_prefix.length > 47)) return { format: "raw", fields: {}, warnings: ["妖怪三国志用のQRはURLの区切りが必要です。区切りまでの文字列は47バイト以内にしてください。"], details };
     const fields = { qr_type: parsed.qr_type, serial: parsed.serial };
     details.checksum_valid = parsed.checksum_valid;
     details["検証文字列"] = parsed.checksum_valid ? "一致" : "不一致";
@@ -125,8 +126,8 @@ const QRLocal = (() => {
     const reward = rows.find(row => row.profile === parsed.profile && row.start <= number && number <= row.end);
     if (reward) {
       if (reward.selectable === false) {
-        details["表示名"] = "受取対象外（旧データ）";
-        details["報酬"] = "受取対象外（旧データ）";
+        details["表示名"] = catalog.game_id === "sangokushi" ? "受取対象外" : "受取対象外（旧データ）";
+        details["報酬"] = details["表示名"];
         details["受け取り可否"] = "受け取り不可";
         warnings.push(reward.unsupported_reason || "このQRの報酬は、このゲームの受け取り対象ではありません。");
         return { format: parsed.profile, fields, warnings, details };
@@ -145,6 +146,11 @@ const QRLocal = (() => {
         warnings.push("このQRの受け取り内容はゲーム内で抽選されます。");
       }
       if (catalog.items.find(item => item.item_id === reward.item_id)?.item_kind === "ITEM_IMPORTANT") warnings.push("大事なものです。受け取り・使用条件はゲームの所持状況や進行で決まります。");
+    } else if (catalog.game_id === "sangokushi") {
+      details["表示名"] = catalog.fallback?.label || "受取対象外";
+      details["報酬"] = details["表示名"];
+      details["受け取り可否"] = "受け取り不可";
+      warnings.push(catalog.fallback?.description || "この種類番号は、このゲームの受け取り対象ではありません。");
     } else {
       details["報酬"] = "ランダム報酬";
       warnings.push("この種類番号の報酬はゲーム内の抽選で決まります。");
@@ -212,20 +218,23 @@ const QRLocal = (() => {
   }
 
   async function request(route, data = {}) {
-    catalogPromise ||= fetch(new URL("./catalog.json?v=20261005-2", document.baseURI)).then(response => { if (!response.ok) throw new Error("アイテム一覧を読み込めませんでした。"); return response.json(); }).catch(error => { catalogPromise = null; throw error; });
+    catalogPromise ||= fetch(new URL("./catalog.json?v=20261005-3", document.baseURI)).then(response => { if (!response.ok) throw new Error("アイテム一覧を読み込めませんでした。"); return response.json(); }).catch(error => { catalogPromise = null; throw error; });
     const rootCatalog = await catalogPromise;
     const game = data.game || "yw2";
-    if (!["yw1", "yw2", "yw3", "busters", "busters2"].includes(game)) throw new Error("対応していない作品です。");
+    if (!["yw1", "yw2", "yw3", "sangokushi", "busters", "busters2"].includes(game)) throw new Error("対応していない作品です。");
     const catalog = rootCatalog.game_id === game || !rootCatalog.game_id && game === "yw2" ? rootCatalog : rootCatalog.games?.[game];
     if (!catalog) throw new Error("作品のアイテム一覧を読み込めませんでした。");
     if (route === "/api/catalog") return catalog;
     let payload;
     if (route === "/api/generate") {
-      if (game === "yw1" && data.format !== "raw" && !catalog.formats.some(format => format.id === data.format)) throw new Error("妖怪ウォッチ（初代）用のQR形式ではありません。");
+      if (["yw1", "sangokushi"].includes(game) && data.format !== "raw" && !catalog.formats.some(format => format.id === data.format)) throw new Error(game === "yw1" ? "妖怪ウォッチ（初代）用のQR形式ではありません。" : "妖怪三国志用のQR形式ではありません。");
       payload = data.format === "raw" ? parseHex(data.hex) : encode(data.format, data.fields?.qr_type, data.fields?.serial);
       if (data.template_hex && data.format !== "raw") {
         const template = decode(parseHex(data.template_hex));
-        if (template?.profile === data.format && template.has_separator) payload = Uint8Array.from(template.uri_prefix + String.fromCharCode(...payload).split("/").pop(), char => char.charCodeAt(0));
+        if (template?.profile === data.format && template.has_separator) {
+          if (game === "sangokushi" && template.uri_prefix.length > 47) throw new Error("妖怪三国志用のQRはURLの区切りまで47バイト以内にしてください。");
+          payload = Uint8Array.from(template.uri_prefix + String.fromCharCode(...payload).split("/").pop(), char => char.charCodeAt(0));
+        }
       }
     } else if (route === "/api/decode") payload = data.hex !== undefined ? parseHex(data.hex) : await readImage(data.image);
     else throw new Error("対応していない操作です。");
